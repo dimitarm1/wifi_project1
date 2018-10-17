@@ -42,20 +42,50 @@ SSD1306Brzo display(0x3C, 4, 5);
 /* Set these to your desired credentials. */
 const char *ssid = "ESPap";
 const char *password = "thereisnospoon";
+bool IsConfigured = false;
 
 ESP8266WebServer server(80);
+
+
+void handleBody() {
+   if (server.hasArg("ssid")== true){ //Check if body received
+        IsConfigured = true; 
+        server.send(200, "text/html", "<h1>Configuration OK</h1>");
+   }
+   else
+   {
+       server.send(200, "text/html", "<h1>Configuration NOT Accepted</h1>");
+   }
+}
 
 /* Just a little test message.  Go to http://192.168.4.1 in a web browser
  * connected to this access point to see it.
  */
-void handleRoot() {
-  server.send(200, "text/html", "<h1>You are connected</h1>");
-  digitalWrite(15, HIGH);  
+void handleRoot() { 
+  if(!IsConfigured)
+  {
+    server.send(200, "text/html", "<form action=\"/action_page.php\" method=\"post\">SSID:<br> <input type=\"text\" name=\"ssid\" value=\"Enter\"><br>"
+      "Password:<br>  <input type=\"text\" name=\"password\" value=\"Mouse\"><br><br>  <input type=\"submit\" value=\"Submit\"></form>");
+  }
+  else
+  {
+      if(digitalRead(9))
+      {
+         server.send(200, "text/html", "<h1>Input off</h1>");
+         digitalWrite(15, LOW);  
+      }
+      else
+      {
+         server.send(200, "text/html", "<h1>Input ON</h1>");
+         digitalWrite(15, HIGH);  
+      } 
+  }
 }
 
 void setup() {
   delay(1000);
   pinMode(15, OUTPUT);
+  pinMode(9, INPUT_PULLUP);
   //Serial.begin(115200);
   //Serial.println();
   //Serial.print("Configuring access point...");
@@ -65,14 +95,15 @@ void setup() {
   IPAddress myIP = WiFi.softAPIP();
   //Serial.print("AP IP address: ");
   //Serial.println(myIP);
-  server.on("/", handleRoot);
+  server.on("/", HTTP_GET, handleRoot);
+  server.on("/action_page.php",HTTP_POST, handleBody); //Associate the handler function to the path
   server.begin();
   //Serial.println("HTTP server started");
   display.init();
   display.flipScreenVertically();
   display.setContrast(255);
   display.clear();
-  display.setFont(ArialMT_Plain_16);
+  display.setFont(ArialMT_Plain_10);
   display.setTextAlignment(TEXT_ALIGN_CENTER_BOTH);
   display.drawString(display.getWidth()/2, display.getHeight()/2 - 10, "Solar Power");
   display.display();
