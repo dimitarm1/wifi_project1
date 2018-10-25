@@ -58,7 +58,15 @@ void handleNotFound(){
 
 void handleBody() {
    if (server.hasArg("ssid")== true){ //Check if body received
+        String received_SSID = server.arg("ssid");
+        String received_password = server.arg("password");
+        received_SSID.toCharArray(ssid_name, sizeof(ssid_name));
+        received_password.toCharArray(ssid_password, sizeof(ssid_password));
+        EEPROM.put(1,ssid_name);
+        EEPROM.put(21, ssid_password);
+        
         IsConfigured = true; 
+        EEPROM.commit();
         server.send(200, "text/html", "<h1>Configuration OK</h1>");
    }
    else
@@ -74,7 +82,7 @@ void handleRoot() {
   if(!IsConfigured)
   {
     server.send(200, "text/html", "<form action=\"/action_page.php\" method=\"post\">SSID:<br> <input type=\"text\" name=\"ssid\" value=\"Enter\"><br>"
-      "Password:<br>  <input type=\"text\" name=\"password\" value=\"Mouse\"><br><br>  <input type=\"submit\" value=\"Submit\"></form>");
+      "Password:<br>  <input type=\"text\" name=\"password\" value=\"Enter_password\"><br><br>  <input type=\"submit\" value=\"Submit\"></form>");
   }
   else
   {
@@ -100,22 +108,12 @@ void setup() {
   //Serial.print("Configuring access point...");
   /* You can remove the password parameter if you want the AP to be open. */
   EEPROM.begin(512); 
-  for(unsigned char i  = 1; i < 20; i++)
-  {
-    ssid_name[i-1] = EEPROM.read(i);
-  }
+  EEPROM.get(1,ssid_name);
+  EEPROM.get(1,ssid_password);
+ 
   if(strlen(ssid_name) > 0)
   {
-    for(unsigned char i  = 21; i < 40; i++)
-    {
-      ssid_password[i-21] = EEPROM.read(i);
-      if( ssid_password[i-21] == ' ')
-      {
-        ssid_password[i-21] = 0; // Space means no password!!!
-        break;
-      }
-    } 
-    startHotSpot = true;
+   startHotSpot = true;
   }
   if(digitalRead(9))
   {
@@ -129,7 +127,6 @@ void setup() {
   display.setFont(ArialMT_Plain_10);
   display.setTextAlignment(TEXT_ALIGN_CENTER_BOTH);
   display.drawString(display.getWidth()/2, 10, "Solar Power");
-  startHotSpot = false;
   if(startHotSpot)
   {
     sprintf(ssid_name, "Solarium_%08x",ESP.getChipId());
@@ -140,6 +137,7 @@ void setup() {
    
     display.drawString(display.getWidth()/2, 25, "HotSpot:");
     display.drawString(display.getWidth()/2, 35, ssid_name);
+    display.drawString(display.getWidth()/2, 45, myIP.toString());
     display.display();
   }
   else
@@ -147,10 +145,11 @@ void setup() {
     WiFi.mode(WIFI_STA);
     WiFi.setAutoReconnect(true);    
     //WiFi.begin(ssid_name, ssid_password);
-    WiFi.begin("LENX");
+  
+    WiFi.begin(ssid_name, ssid_password);
     display.setTextAlignment(TEXT_ALIGN_LEFT);
-    display.drawString(1, 25, "SSID:");
-    display.drawString(35, 25, "ssid_name");   
+    display.drawString(1, 25, ssid_name);
+    display.drawString(35, 25, ssid_password);   
   }
   server.on("/", HTTP_GET, handleRoot);
   server.on("/action_page.php",HTTP_POST, handleBody); //Associate the handler function to the path  
@@ -188,10 +187,13 @@ void loop() {
     display.display();
     
     return;  
-  }  
-  display.clear();
-  display.drawString(2, 45, WiFi.localIP().toString());
-  display.display();
+  } 
+  if( !startHotSpot)
+  {
+    display.clear();
+    display.drawString(20, 45, WiFi.localIP().toString());
+    display.display();
+  }
   server.handleClient();
   
   // Call Espressif SDK functionality - wrapped in ifdef so that it still
