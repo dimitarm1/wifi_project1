@@ -136,7 +136,7 @@ void handleRoot() {
 void setup() {
   delay(1000);
   pinMode(15, OUTPUT);
-  pinMode(9, INPUT_PULLUP);
+  pinMode(13, INPUT_PULLUP);
   //Serial.begin(115200);
   //Serial.println();
   //Serial.print("Configuring access point...");
@@ -145,15 +145,15 @@ void setup() {
   EEPROM.get(1,ssid_name);
   EEPROM.get(21,ssid_password);
   EEPROM.end();
-  if(strlen(ssid_name) == 0)
-  {
-   startHotSpot = true;
-  }
-  if(!digitalRead(9))
+//  if(strlen(ssid_name) == 0)
+//  {
+//   startHotSpot = true;
+//  }
+  if(!digitalRead(13))
   {
     startHotSpot = true;
   }
-  
+  WiFi.setAutoConnect(false);
   display.init();
   display.flipScreenVertically();
   display.setContrast(255);
