@@ -29,6 +29,7 @@
 #include <ESP8266WiFi.h>
 #include <WiFiClient.h> 
 #include <ESP8266WebServer.h>
+#include <Ticker.h>  //Ticker Library
 extern "C" {
 #include "user_interface.h"
 }
@@ -47,10 +48,34 @@ bool IsConfigured = false;
 
 char ssid_name[20];
 char ssid_password[20];
-bool startHotSpot = true;
+bool startHotSpot = false;
 char counter;
+char text_buffer[30];
+int main_time_seconds = 200;
+int pre_time_seconds = 30;
+int cool_time_seconds=10;
+bool second_trigger;
+Ticker tick_counter;
 
 ESP8266WebServer server(80);
+
+
+void tick_routine()
+{
+  if(pre_time_seconds)
+  {
+    pre_time_seconds--;
+  }
+  else if(main_time_seconds)
+  {
+    main_time_seconds--;
+  }
+  else if(cool_time_seconds)
+  {
+    cool_time_seconds--;
+  }
+  second_trigger = !second_trigger;
+}
 
 void handleNotFound(){
   server.send(404, "text/plain", "404: Not found"); // Send HTTP status 404 (Not Found) when there's no handler for the URI in the request
@@ -58,6 +83,7 @@ void handleNotFound(){
 
 void handleBody() {
    if (server.hasArg("ssid")== true){ //Check if body received
+        EEPROM.begin(512); 
         String received_SSID = server.arg("ssid");
         String received_password = server.arg("password");
         received_SSID.toCharArray(ssid_name, sizeof(ssid_name));
@@ -67,7 +93,15 @@ void handleBody() {
         
         IsConfigured = true; 
         EEPROM.commit();
-        server.send(200, "text/html", "<h1>Configuration OK</h1>");
+        EEPROM.end(); 
+        EEPROM.begin(512); 
+        EEPROM.get(1,ssid_name);
+        EEPROM.get(21,ssid_password);
+        EEPROM.end();
+        String message = String("<h1>SSID: ") + String(ssid_name) + String("<br>Password: ") + String(ssid_password) + String("</h1><br> Please Restart the module");
+        server.send(200, "text/html", message);
+        delay(1000);
+        //ESP.restart();
    }
    else
    {
@@ -109,13 +143,13 @@ void setup() {
   /* You can remove the password parameter if you want the AP to be open. */
   EEPROM.begin(512); 
   EEPROM.get(1,ssid_name);
-  EEPROM.get(1,ssid_password);
- 
-  if(strlen(ssid_name) > 0)
+  EEPROM.get(21,ssid_password);
+  EEPROM.end();
+  if(strlen(ssid_name) == 0)
   {
    startHotSpot = true;
   }
-  if(digitalRead(9))
+  if(!digitalRead(9))
   {
     startHotSpot = true;
   }
@@ -149,7 +183,9 @@ void setup() {
     WiFi.begin(ssid_name, ssid_password);
     display.setTextAlignment(TEXT_ALIGN_LEFT);
     display.drawString(1, 25, ssid_name);
-    display.drawString(35, 25, ssid_password);   
+    display.drawString(35, 25, ssid_password);
+    IsConfigured = true;   
+    tick_counter.attach(1,tick_routine);
   }
   server.on("/", HTTP_GET, handleRoot);
   server.on("/action_page.php",HTTP_POST, handleBody); //Associate the handler function to the path  
@@ -191,8 +227,35 @@ void loop() {
   if( !startHotSpot)
   {
     display.clear();
-    display.drawString(20, 45, WiFi.localIP().toString());
+    display.setFont(ArialMT_Plain_10);
+    display.setTextAlignment(TEXT_ALIGN_LEFT);
+    display.drawString(20, 50, "IP:");
+    display.drawString(40, 50, WiFi.localIP().toString());
+    if(second_trigger)
+    {
+      display.drawString(4, 50, "<>");
+    }
+    else
+    {
+      display.drawString(4, 50, "><");
+    }
+    sprintf(text_buffer, "%02d:%02d",pre_time_seconds/60, pre_time_seconds%60);
+    display.drawString(2, 5, text_buffer);
+    sprintf(text_buffer, "%02d:%02d",cool_time_seconds/60, cool_time_seconds%60);
+    display.drawString(100, 5, text_buffer);
+    display.setFont(ArialMT_Plain_24);
+    display.setTextAlignment(TEXT_ALIGN_CENTER_BOTH);
+    sprintf(text_buffer, "%02d:%02d",main_time_seconds/60, main_time_seconds%60);
+    display.drawString(display.getWidth()/2, 32, text_buffer);
     display.display();
+    if((!pre_time_seconds) && main_time_seconds)
+    {
+      digitalWrite(15,1);
+    }
+    else
+    {
+      digitalWrite(15,0);
+    }
   }
   server.handleClient();
   
