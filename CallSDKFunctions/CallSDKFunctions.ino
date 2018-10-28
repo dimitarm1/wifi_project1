@@ -115,8 +115,21 @@ void handleBody() {
 void handleRoot() { 
   if(!IsConfigured)
   {
-    server.send(200, "text/html", "<form action=\"/action_page.php\" method=\"post\">SSID:<br> <input type=\"text\" name=\"ssid\" value=\"Enter\"><br>"
-      "Password:<br>  <input type=\"text\" name=\"password\" value=\"Enter_password\"><br><br>  <input type=\"submit\" value=\"Submit\"></form>");
+    server.send(200, "text/html", "<head><style>html,body {"
+      "height:100%;"
+      "width:100%;"
+      "margin:0;"
+      "background: #466368;  background: -webkit-linear-gradient(#648880, #293f50);  background:    -moz-linear-gradient(#648880, #293f50);"
+      "}"
+      "body , body {"
+      "display:flex;"
+      "}"
+      "form {"
+      "margin:auto;"
+      "}</style></head><body><br><div align=\"center\"><h1>Solar Power</h1><br><form "
+      "action=\"/action_page.php\" method=\"post\"><p><input type=\"text\" name=\"ssid\" placeholder=\"Your SSID\"></p>"
+      "<p><input type=\"text\" name=\"password\" placeholder=\"Your password\"></p> "
+      "<p>   IP address:<br>  <input type=\"text\" name=\"ip_address\" value=\"192.168.1.250\"></p><p> <input type=\"submit\" value=\"Submit\"></p></form></div></body>");
   }
   else
   {
