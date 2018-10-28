@@ -48,14 +48,22 @@ bool IsConfigured = false;
 
 char ssid_name[20];
 char ssid_password[20];
+char ip_address[20];
 bool startHotSpot = false;
 char counter;
-char text_buffer[30];
-int main_time_seconds = 200;
-int pre_time_seconds = 30;
-int cool_time_seconds=10;
+char text_buffer1[10];
+char text_buffer2[10];
+char text_buffer3[10];
+int main_time_seconds = 0;
+int pre_time_seconds = 0;
+int cool_time_seconds = 0;
 bool second_trigger;
 Ticker tick_counter;
+
+// config static IP
+IPAddress ip(192, 168, 1, 250); // where xx is the desired IP Address
+IPAddress gateway(192, 168, 0, 1); // set gateway to match your network
+IPAddress subnet(255, 255, 255, 0); // set subnet mask to match your network
 
 ESP8266WebServer server(80);
 
@@ -81,15 +89,53 @@ void handleNotFound(){
   server.send(404, "text/plain", "404: Not found"); // Send HTTP status 404 (Not Found) when there's no handler for the URI in the request
 }
 
+void handleStart() {
+   if (server.hasArg("time")== true){ //Check if time received
+        String received_time = server.arg("time");        
+        pre_time_seconds = 480;
+        cool_time_seconds = 180;
+        main_time_seconds = received_time.toInt()*60;
+        server.sendHeader("Location", String("/"), true);
+        server.send ( 302, "text/plain", "");        
+   }
+   else
+   {
+       server.send(200, "text/html", "<h1>NOT Accepted</h1>");
+   }
+}
+
+void handleManualStart() {
+    if(pre_time_seconds)
+    {
+      pre_time_seconds = 0;
+    }
+    server.sendHeader("Location", String("/"), true);
+    server.send ( 302, "text/plain", "");        
+}
+
+void handleStop() {
+    if(!main_time_seconds)
+    {
+      cool_time_seconds = 0;
+    }
+    pre_time_seconds = 0;
+    main_time_seconds = 0;   
+    server.sendHeader("Location", String("/"), true);
+    server.send ( 302, "text/plain", "");        
+}
+
 void handleBody() {
    if (server.hasArg("ssid")== true){ //Check if body received
         EEPROM.begin(512); 
         String received_SSID = server.arg("ssid");
         String received_password = server.arg("password");
+        String received_IP = server.arg("p_address");
         received_SSID.toCharArray(ssid_name, sizeof(ssid_name));
         received_password.toCharArray(ssid_password, sizeof(ssid_password));
+        received_IP.toCharArray(ip_address, sizeof(ip_address));
         EEPROM.put(1,ssid_name);
         EEPROM.put(21, ssid_password);
+        EEPROM.put(41, ip_address);
         
         IsConfigured = true; 
         EEPROM.commit();
@@ -97,8 +143,10 @@ void handleBody() {
         EEPROM.begin(512); 
         EEPROM.get(1,ssid_name);
         EEPROM.get(21,ssid_password);
+        EEPROM.get(41,ip_address);
         EEPROM.end();
-        String message = String("<h1>SSID: ") + String(ssid_name) + String("<br>Password: ") + String(ssid_password) + String("</h1><br> Please Restart the module");
+        String message = String("<h1>SSID: ") + String(ssid_name) + String("<br>Password: ") + String(ssid_password) +
+          String("<br>IP address: ") + String(ip_address) + String("</h1><br> Please Restart the module");
         server.send(200, "text/html", message);
         delay(1000);
         //ESP.restart();
@@ -133,15 +181,85 @@ void handleRoot() {
   }
   else
   {
-      if(digitalRead(9))
+      if(!(main_time_seconds || pre_time_seconds || cool_time_seconds))
       {
-         server.send(200, "text/html", "<h1>Input off</h1>");
-         digitalWrite(15, LOW);  
+        server.send(200, "text/html", "<head><style>html,body {"
+          "height:100%;"
+          "width:100%;"
+          "margin:0;"
+          "background: #466368;  background: -webkit-linear-gradient(#648880, #293f50);  background:    -moz-linear-gradient(#648880, #293f50);"
+          "}"
+          "body , body {"
+          "display:flex;"
+          "}"
+          "form {"
+          "margin:auto;"
+          "}</style></head><body><br><div align=\"center\"><h1>Solar Power</h1><br><form action=\"/set_time_page.php\"method=\"post\">"
+            "<select name=\"time\">"
+            "<option value=\"1\">1</option>"
+            "<option value=\"2\">2</option>"
+            "<option value=\"3\">3</option>"
+            "<option value=\"4\">4</option>"
+            "<option value=\"5\">5</option>"
+            "<option value=\"6\">6</option>"
+            "<option value=\"7\">7</option>"
+            "<option value=\"8\">8</option>"
+            "<option value=\"9\">9</option>"
+            "<option value=\"10\">10</option>"
+            "<option value=\"11\">11</option>"
+            "<option value=\"12\">12</option>"
+            "<option value=\"13\">13</option>"
+            "<option value=\"14\">14</option>"
+            "<option value=\"15\">15</option>"
+            "<option value=\"16\">16</option>"
+            "<option value=\"17\">17</option>"
+            "<option value=\"18\">18</option>"
+            "<option value=\"19\">19</option>"
+            "<option value=\"20\">20</option>"
+            "</select>"
+            "<br><br>"
+          "<input type=\"submit\">"
+          "</form>"
+          "</div></body>");       
+      }
+      else if (pre_time_seconds)
+      {
+        server.send(200, "text/html", "<head><meta http-equiv='refresh' content='5' ><style>html,body {"
+          "height:100%;"
+          "width:100%;"
+          "margin:0;"
+          "background: #466368;  background: -webkit-linear-gradient(#648880, #293f50);  background:    -moz-linear-gradient(#648880, #293f50);"
+          "}"
+          "body , body {"
+          "display:flex;"
+          "}"
+          "form {"
+          "margin:auto;"
+          "}</style></head><body><br><div align=\"center\"><h1>Solar Power</h1><br>"
+          "Waiting:" + String(text_buffer1) + "<br><h2>Working:" + String(text_buffer3) + "</h2><br>Cooling:" + String(text_buffer2) + 
+          "<br><form action=\"/start_time_page.php\" method=\"post\">"  
+          "<input type=\"submit\" value=\"Start\">"
+          "</form>"
+          "<br><form action=\"/work_time_page.php\" method=\"post\">"  
+          "<input type=\"submit\" value=\"Stop\"></p></form></div></body>");
       }
       else
       {
-         server.send(200, "text/html", "<h1>Input ON</h1>");
-         digitalWrite(15, HIGH);  
+        server.send(200, "text/html", "<head><meta http-equiv='refresh' content='5' ><style>html,body {"
+          "height:100%;"
+          "width:100%;"
+          "margin:0;"
+          "background: #466368;  background: -webkit-linear-gradient(#648880, #293f50);  background:    -moz-linear-gradient(#648880, #293f50);"
+          "}"
+          "body , body {"
+          "display:flex;"
+          "}"
+          "form {"
+          "margin:auto;"
+          "}</style></head><body><br><div align=\"center\"><h1>Solar Power</h1><br>"
+          "Waiting:" + String(text_buffer1) + "<br><h2>Working:" + String(text_buffer3) + "</h2><br>Cooling:" + String(text_buffer2) + 
+          "<br><form action=\"/work_time_page.php\" method=\"post\">"  
+          "<input type=\"submit\" value=\"Stop\"></p></form></div></body>");
       } 
   }
 }
@@ -157,6 +275,7 @@ void setup() {
   EEPROM.begin(512); 
   EEPROM.get(1,ssid_name);
   EEPROM.get(21,ssid_password);
+  EEPROM.get(41,ip_address);
   EEPROM.end();
 //  if(strlen(ssid_name) == 0)
 //  {
@@ -192,7 +311,10 @@ void setup() {
     WiFi.mode(WIFI_STA);
     WiFi.setAutoReconnect(true);    
     //WiFi.begin(ssid_name, ssid_password);
-  
+    if(ip.fromString(ip_address))
+    {
+      WiFi.config(ip, gateway, subnet);
+    }
     WiFi.begin(ssid_name, ssid_password);
     display.setTextAlignment(TEXT_ALIGN_LEFT);
     display.drawString(1, 25, ssid_name);
@@ -201,7 +323,10 @@ void setup() {
     tick_counter.attach(1,tick_routine);
   }
   server.on("/", HTTP_GET, handleRoot);
-  server.on("/action_page.php",HTTP_POST, handleBody); //Associate the handler function to the path  
+  server.on("/action_page.php",HTTP_POST, handleBody); //Associate the handler function to the path 
+  server.on("/set_time_page.php",HTTP_POST, handleStart); 
+  server.on("/work_time_page.php",HTTP_POST, handleStop); 
+  server.on("/start_time_page.php",HTTP_POST, handleManualStart);  
   server.onNotFound(handleNotFound);           // When a client requests an unknown URI (i.e. something other than "/"), call function "handleNotFound"
   server.begin();
   //Serial.println("HTTP server started");
@@ -239,6 +364,10 @@ void loop() {
   } 
   if( !startHotSpot)
   {
+    if(!digitalRead(13))
+    {
+      pre_time_seconds = 0;
+    }
     display.clear();
     display.setFont(ArialMT_Plain_10);
     display.setTextAlignment(TEXT_ALIGN_LEFT);
@@ -252,14 +381,14 @@ void loop() {
     {
       display.drawString(4, 50, "><");
     }
-    sprintf(text_buffer, "%02d:%02d",pre_time_seconds/60, pre_time_seconds%60);
-    display.drawString(2, 5, text_buffer);
-    sprintf(text_buffer, "%02d:%02d",cool_time_seconds/60, cool_time_seconds%60);
-    display.drawString(100, 5, text_buffer);
+    sprintf(text_buffer1, "%02d:%02d",pre_time_seconds/60, pre_time_seconds%60);
+    display.drawString(2, 5, text_buffer1);
+    sprintf(text_buffer2, "%02d:%02d",cool_time_seconds/60, cool_time_seconds%60);
+    display.drawString(100, 5, text_buffer2);
     display.setFont(ArialMT_Plain_24);
     display.setTextAlignment(TEXT_ALIGN_CENTER_BOTH);
-    sprintf(text_buffer, "%02d:%02d",main_time_seconds/60, main_time_seconds%60);
-    display.drawString(display.getWidth()/2, 32, text_buffer);
+    sprintf(text_buffer3, "%02d:%02d",main_time_seconds/60, main_time_seconds%60);
+    display.drawString(display.getWidth()/2, 32, text_buffer3);
     display.display();
     if((!pre_time_seconds) && main_time_seconds)
     {
