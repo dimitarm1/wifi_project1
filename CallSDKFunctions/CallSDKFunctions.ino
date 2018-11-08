@@ -317,8 +317,8 @@ void setup() {
     }
     WiFi.begin(ssid_name, ssid_password);
     display.setTextAlignment(TEXT_ALIGN_LEFT);
-    display.drawString(1, 25, ssid_name);
-    display.drawString(35, 25, ssid_password);
+    display.drawString(1, 20, ssid_name);
+    display.drawString(1, 30, ssid_password);
     IsConfigured = true;   
     tick_counter.attach(1,tick_routine);
   }
@@ -340,7 +340,7 @@ void loop() {
   {
     delay(500);          
     display.setColor(BLACK);
-    display.fillRect(0, 35, display.getWidth(), 20);
+    display.fillRect(0, 40, display.getWidth(), 20);
     display.setColor(WHITE);
     counter++;     
     switch(counter)
